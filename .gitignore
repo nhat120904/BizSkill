@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.env.local
+.env.production
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Next.js
+.next/
+out/
+
+# Testing
+coverage/
+htmlcov/
+.coverage
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.docker/
+
+# Database
+*.db
+*.sqlite
+
+# Audio files (should never be committed)
+*.mp3
+*.wav
+*.m4a
+*.opus
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Misc
+*.bak
+*.orig
+
+/docs
