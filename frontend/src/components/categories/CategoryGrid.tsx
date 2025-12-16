@@ -1,22 +1,34 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-
-const CATEGORIES = [
-  { name: "Leadership", slug: "leadership", icon: "👑", color: "#FFD700" },
-  { name: "Communication", slug: "communication", icon: "💬", color: "#4A90E2" },
-  { name: "Sales", slug: "sales", icon: "💰", color: "#27AE60" },
-  { name: "Marketing", slug: "marketing", icon: "📢", color: "#E74C3C" },
-  { name: "Productivity", slug: "productivity", icon: "⚡", color: "#F39C12" },
-  { name: "Career Growth", slug: "career-growth", icon: "📈", color: "#9B59B6" },
-  { name: "Negotiation", slug: "negotiation", icon: "🤝", color: "#1ABC9C" },
-  { name: "Entrepreneurship", slug: "entrepreneurship", icon: "🚀", color: "#E91E63" },
-];
+import { api } from "@/lib/api";
+import { Category } from "@/types";
 
 export function CategoryGrid() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getCategories()
+      .then((data) => setCategories(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="animate-pulse rounded-xl bg-gray-200 h-28" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-      {CATEGORIES.map((category) => (
+      {categories.map((category) => (
         <Link
           key={category.slug}
           href={`/categories/${category.slug}`}
@@ -24,13 +36,16 @@ export function CategoryGrid() {
         >
           <div
             className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity"
-            style={{ backgroundColor: category.color }}
+            style={{ backgroundColor: category.color || '#005eff' }}
           />
           <div className="relative">
-            <span className="text-3xl mb-3 block">{category.icon}</span>
+            <span className="text-3xl mb-3 block">{category.icon || '📚'}</span>
             <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
               {category.name}
             </h3>
+            {category.segment_count !== undefined && category.segment_count > 0 && (
+              <p className="text-sm text-gray-500 mt-1">{category.segment_count} clips</p>
+            )}
           </div>
         </Link>
       ))}
