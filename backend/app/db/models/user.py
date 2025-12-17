@@ -29,6 +29,8 @@ class User(Base):
     interests = relationship("UserInterest", back_populates="user", cascade="all, delete-orphan")
     history = relationship("UserHistory", back_populates="user", cascade="all, delete-orphan")
     saved_segments = relationship("SavedSegment", back_populates="user", cascade="all, delete-orphan")
+    learning_paths = relationship("LearningPath", back_populates="user", cascade="all, delete-orphan")
+    skill_assessments = relationship("SkillAssessment", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User {self.email}>"

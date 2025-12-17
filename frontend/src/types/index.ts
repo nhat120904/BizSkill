@@ -78,3 +78,80 @@ export interface AuthResponse {
   token_type: string;
   user: User;
 }
+
+// ============ Learning Path Types ============
+
+export interface LearningPathLesson {
+  id: string;
+  order: number;
+  title?: string;
+  description?: string;
+  learning_objective?: string;
+  context_notes?: string;
+  key_concepts?: string[];
+  is_completed: boolean;
+  is_locked: boolean;
+  completed_at?: string;
+  segment?: Segment;
+}
+
+export interface LearningPath {
+  id: string;
+  title: string;
+  description?: string;
+  target_skill: string;
+  current_level?: string;
+  target_level?: string;
+  skill_gap_analysis?: string;
+  learning_objectives?: string[];
+  estimated_hours?: number;
+  status: 'draft' | 'active' | 'completed' | 'paused';
+  progress_percentage: number;
+  completed_lessons: number;
+  total_lessons: number;
+  started_at?: string;
+  completed_at?: string;
+  last_activity_at?: string;
+  created_at: string;
+  lessons?: LearningPathLesson[];
+}
+
+export interface LearningPathCreateRequest {
+  target_skill: string;
+  current_level: number;
+  target_level: number;
+  goals?: string;
+  time_commitment_hours?: number;
+}
+
+export interface SkillGapAnalysis {
+  current_level: string;
+  target_level: string;
+  gap_description: string;
+  key_areas_to_improve: string[];
+  estimated_learning_hours: number;
+  recommended_approach: string;
+}
+
+export interface NextLessonSuggestion {
+  segment_id: string;
+  reason: string;
+  relevance_score: number;
+  connects_to_previous: string;
+}
+
+export interface LessonCompleteResponse {
+  lesson: LearningPathLesson;
+  next_suggestion?: NextLessonSuggestion;
+  path_completed: boolean;
+}
+
+export interface SuggestedSkill {
+  skill: string;
+  category_id: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  available_lessons: number;
+  is_interest: boolean;
+}

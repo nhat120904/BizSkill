@@ -1,5 +1,9 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { Segment, Category, SearchResult, FeedResult, Channel, User, AuthResponse } from '@/types';
+import { 
+  Segment, Category, SearchResult, FeedResult, Channel, User, AuthResponse,
+  LearningPath, LearningPathLesson, LearningPathCreateRequest, 
+  SkillGapAnalysis, LessonCompleteResponse, SuggestedSkill
+} from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -230,6 +234,62 @@ class ApiClient {
       params: { page, limit },
     });
     return response.data.segments || [];
+  }
+
+  // ============ Learning Paths ============
+
+  async createLearningPath(data: LearningPathCreateRequest): Promise<LearningPath> {
+    const response = await this.client.post<LearningPath>('/learning-paths/', data);
+    return response.data;
+  }
+
+  async getLearningPaths(status?: string): Promise<{ paths: LearningPath[]; total: number }> {
+    const response = await this.client.get<{ paths: LearningPath[]; total: number }>('/learning-paths/', {
+      params: status ? { status_filter: status } : {},
+    });
+    return response.data;
+  }
+
+  async getLearningPath(pathId: string): Promise<LearningPath> {
+    const response = await this.client.get<LearningPath>(`/learning-paths/${pathId}`);
+    return response.data;
+  }
+
+  async deleteLearningPath(pathId: string): Promise<void> {
+    await this.client.delete(`/learning-paths/${pathId}`);
+  }
+
+  async updateLearningPathStatus(pathId: string, status: 'active' | 'paused'): Promise<void> {
+    await this.client.patch(`/learning-paths/${pathId}/status`, null, {
+      params: { new_status: status },
+    });
+  }
+
+  async getLesson(pathId: string, lessonId: string): Promise<LearningPathLesson> {
+    const response = await this.client.get<LearningPathLesson>(
+      `/learning-paths/${pathId}/lessons/${lessonId}`
+    );
+    return response.data;
+  }
+
+  async completeLesson(pathId: string, lessonId: string): Promise<LessonCompleteResponse> {
+    const response = await this.client.post<LessonCompleteResponse>(
+      `/learning-paths/${pathId}/lessons/${lessonId}/complete`
+    );
+    return response.data;
+  }
+
+  async analyzeSkillGap(data: LearningPathCreateRequest): Promise<SkillGapAnalysis> {
+    const response = await this.client.post<SkillGapAnalysis>(
+      '/learning-paths/analyze-skill-gap',
+      data
+    );
+    return response.data;
+  }
+
+  async getSuggestedSkills(): Promise<SuggestedSkill[]> {
+    const response = await this.client.get<SuggestedSkill[]>('/learning-paths/suggested-skills');
+    return response.data;
   }
 }
 

@@ -199,3 +199,86 @@ class StatsResponse(BaseModel):
     indexed_videos: int
     processing_videos: int
     failed_videos: int
+
+
+# ============ Learning Path Schemas ============
+
+class SkillAssessmentCreate(BaseModel):
+    target_skill: str = Field(..., min_length=2, max_length=200)
+    current_level: int = Field(..., ge=1, le=5)
+    target_level: int = Field(..., ge=1, le=5)
+    goals: Optional[str] = None
+    time_commitment_hours: float = Field(default=5.0, ge=0.5, le=40)
+
+
+class LearningPathCreate(BaseModel):
+    target_skill: str = Field(..., min_length=2, max_length=200)
+    current_level: int = Field(default=1, ge=1, le=5)
+    target_level: int = Field(default=4, ge=1, le=5)
+    goals: Optional[str] = None
+    time_commitment_hours: float = Field(default=5.0, ge=0.5, le=40)
+
+
+class LessonResponse(BaseModel):
+    id: str
+    order: int
+    title: Optional[str] = None
+    description: Optional[str] = None
+    learning_objective: Optional[str] = None
+    context_notes: Optional[str] = None
+    key_concepts: Optional[List[str]] = None
+    is_completed: bool
+    is_locked: bool
+    completed_at: Optional[datetime] = None
+    segment: Optional[SegmentResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LearningPathResponse(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    target_skill: str
+    current_level: Optional[str] = None
+    target_level: Optional[str] = None
+    skill_gap_analysis: Optional[str] = None
+    learning_objectives: Optional[List[str]] = None
+    estimated_hours: Optional[float] = None
+    status: str
+    progress_percentage: float
+    completed_lessons: int
+    total_lessons: int
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LearningPathDetailResponse(LearningPathResponse):
+    lessons: List[LessonResponse] = []
+
+
+class LearningPathListResponse(BaseModel):
+    paths: List[LearningPathResponse]
+    total: int
+
+
+class LessonCompleteResponse(BaseModel):
+    lesson: LessonResponse
+    next_suggestion: Optional[dict] = None
+    path_completed: bool
+
+
+class SkillGapAnalysisResponse(BaseModel):
+    current_level: str
+    target_level: str
+    gap_description: str
+    key_areas_to_improve: List[str]
+    estimated_learning_hours: float
+    recommended_approach: str
+
