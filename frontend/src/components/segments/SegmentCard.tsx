@@ -43,9 +43,28 @@ export function SegmentCard({ segment, compact = false }: SegmentCardProps) {
           <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-primary-400">
             {segment.generated_title || segment.title}
           </h3>
-          <p className="text-xs text-gray-400 mt-1">
-            {segment.channel?.name}
-          </p>
+          {segment.channel && (
+            <span 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = `/channel/${segment.channel?.id}`;
+              }}
+              className="inline-flex items-center gap-1 text-xs text-gray-400 mt-1 
+                       hover:text-primary-400 cursor-pointer transition-colors"
+            >
+              {segment.channel.thumbnail_url ? (
+                <img
+                  src={segment.channel.thumbnail_url}
+                  alt={segment.channel.name}
+                  className="w-3 h-3 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary-500 to-purple-600" />
+              )}
+              {segment.channel.name}
+            </span>
+          )}
           {segment.view_count !== undefined && (
             <p className="text-xs text-gray-500 mt-1">
               {segment.view_count.toLocaleString()} views
@@ -65,7 +84,7 @@ export function SegmentCard({ segment, compact = false }: SegmentCardProps) {
       <div className="relative aspect-video bg-gray-100">
         <Image
           src={thumbnailUrl}
-          alt={segment.title || segment.generated_title}
+          alt={segment.title || segment.generated_title || 'Video thumbnail'}
           fill
           className="object-cover"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -104,9 +123,32 @@ export function SegmentCard({ segment, compact = false }: SegmentCardProps) {
 
         {/* Meta */}
         <div className="flex items-center gap-2 mt-3 text-xs text-gray-400">
-          <span className="font-medium text-gray-600 dark:text-gray-300">
-            {segment.channel?.name}
-          </span>
+          {segment.channel && (
+            <span 
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = `/channel/${segment.channel?.id}`;
+              }}
+              className="flex items-center gap-1.5 font-medium text-gray-600 dark:text-gray-300 
+                       hover:text-primary-500 dark:hover:text-primary-400 cursor-pointer transition-colors"
+            >
+              {segment.channel.thumbnail_url ? (
+                <img
+                  src={segment.channel.thumbnail_url}
+                  alt={segment.channel.name}
+                  className="w-4 h-4 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 
+                              flex items-center justify-center">
+                  <span className="text-[8px] font-bold text-white">
+                    {segment.channel.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              {segment.channel.name}
+            </span>
+          )}
           {segment.categories && segment.categories.length > 0 && (
             <>
               <span>•</span>

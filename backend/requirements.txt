@@ -27,6 +27,12 @@ langchain-openai==0.0.3
 langchain-anthropic==0.1.1
 tiktoken==0.5.2
 
+# Local Models (Whisper + BGE-M3)
+openai-whisper>=20231117
+FlagEmbedding>=1.2.0
+sentence-transformers>=2.2.0
+torch>=2.0.0
+
 # YouTube
 google-api-python-client==2.114.0
 yt-dlp>=2024.1.1
@@ -41,6 +47,9 @@ bcrypt==4.0.1
 python-dotenv==1.0.0
 tenacity==8.2.3
 structlog==24.1.0
+
+# Cloud Storage
+cloudinary==1.38.0
 
 # Testing
 pytest==7.4.4

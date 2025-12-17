@@ -1,5 +1,5 @@
 export interface Channel {
-  id?: string;
+  id: string;
   youtube_channel_id: string;
   name: string;
   description?: string;

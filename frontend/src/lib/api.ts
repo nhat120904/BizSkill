@@ -163,6 +163,19 @@ class ApiClient {
     return response.data.segments || [];
   }
 
+  async getChannelWithSegments(channelId: string, page: number = 1, limit: number = 20): Promise<{
+    channel: Channel & { segment_count?: number };
+    segments: Segment[];
+    total: number;
+    page: number;
+    pages: number;
+  }> {
+    const response = await this.client.get(`/channels/${channelId}/segments`, {
+      params: { page, limit },
+    });
+    return response.data;
+  }
+
   // ============ Auth ============
 
   async login(email: string, password: string): Promise<AuthResponse> {

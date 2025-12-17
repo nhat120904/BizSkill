@@ -170,3 +170,145 @@ def update_video_stats():
         raise
     finally:
         db.close()
+
+
+@celery_app.task
+def cleanup_duplicates():
+    """Weekly task: Clean up duplicate videos and segments"""
+    from app.db.models.video import Video, VideoStatus
+    from app.db.models.segment import Segment
+    from app.services.embedding_service import EmbeddingService
+    from sqlalchemy import func
+    
+    db = get_db_session()
+    
+    try:
+        stats = {
+            "duplicate_videos": 0,
+            "duplicate_segments": 0,
+            "orphan_segments": 0,
+        }
+        
+        # 1. Find and remove duplicate videos (same youtube_id)
+        duplicates = db.query(
+            Video.youtube_id,
+            func.count(Video.id).label('count')
+        ).group_by(Video.youtube_id).having(func.count(Video.id) > 1).all()
+        
+        for dup in duplicates:
+            videos = db.query(Video).filter(
+                Video.youtube_id == dup.youtube_id
+            ).order_by(Video.created_at).all()
+            
+            # Keep the one with most segments and INDEXED status
+            def score_video(v):
+                seg_count = len(v.segments) if v.segments else 0
+                is_indexed = 1 if v.status == VideoStatus.INDEXED.value else 0
+                return (is_indexed, seg_count, v.created_at)
+            
+            videos_sorted = sorted(videos, key=score_video, reverse=True)
+            to_delete = videos_sorted[1:]
+            
+            for v in to_delete:
+                try:
+                    embedding_service = EmbeddingService()
+                    embedding_service.delete_video_embeddings(str(v.id))
+                except Exception as e:
+                    logger.warning("Failed to delete embeddings", video_id=str(v.id), error=str(e))
+                
+                db.delete(v)
+                stats["duplicate_videos"] += 1
+        
+        # 2. Find and remove duplicate segments
+        dup_segments = db.query(
+            Segment.video_id,
+            Segment.start_time,
+            Segment.end_time,
+            func.count(Segment.id).label('count')
+        ).group_by(
+            Segment.video_id, 
+            Segment.start_time, 
+            Segment.end_time
+        ).having(func.count(Segment.id) > 1).all()
+        
+        for dup in dup_segments:
+            segments = db.query(Segment).filter(
+                Segment.video_id == dup.video_id,
+                Segment.start_time == dup.start_time,
+                Segment.end_time == dup.end_time
+            ).order_by(Segment.created_at).all()
+            
+            for seg in segments[1:]:  # Keep first, delete rest
+                if seg.embedding_id:
+                    try:
+                        embedding_service = EmbeddingService()
+                        embedding_service.delete_segment_embedding(seg.embedding_id)
+                    except:
+                        pass
+                db.delete(seg)
+                stats["duplicate_segments"] += 1
+        
+        # 3. Find and remove orphan segments
+        orphans = db.query(Segment).outerjoin(Video).filter(Video.id == None).all()
+        for seg in orphans:
+            if seg.embedding_id:
+                try:
+                    embedding_service = EmbeddingService()
+                    embedding_service.delete_segment_embedding(seg.embedding_id)
+                except:
+                    pass
+            db.delete(seg)
+            stats["orphan_segments"] += 1
+        
+        db.commit()
+        
+        logger.info("Duplicate cleanup complete", **stats)
+        return stats
+        
+    except Exception as e:
+        logger.error("Duplicate cleanup failed", error=str(e))
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task
+def get_database_stats():
+    """Get database statistics for admin dashboard"""
+    from app.db.models.video import Video, VideoStatus
+    from app.db.models.segment import Segment
+    from app.db.models.channel import Channel
+    from sqlalchemy import func
+    
+    db = get_db_session()
+    
+    try:
+        # Video stats by status
+        status_counts = dict(db.query(
+            Video.status,
+            func.count(Video.id)
+        ).group_by(Video.status).all())
+        
+        # Total counts
+        total_videos = db.query(func.count(Video.id)).scalar()
+        total_segments = db.query(func.count(Segment.id)).scalar()
+        total_channels = db.query(func.count(Channel.id)).scalar()
+        active_channels = db.query(func.count(Channel.id)).filter(Channel.is_active == True).scalar()
+        
+        # Segments with embeddings
+        segments_with_embedding = db.query(func.count(Segment.id)).filter(
+            Segment.embedding_id != None
+        ).scalar()
+        
+        return {
+            "total_videos": total_videos,
+            "total_segments": total_segments,
+            "total_channels": total_channels,
+            "active_channels": active_channels,
+            "segments_with_embedding": segments_with_embedding,
+            "videos_by_status": status_counts,
+        }
+        
+    finally:
+        db.close()

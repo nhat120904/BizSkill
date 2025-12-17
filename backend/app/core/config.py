@@ -24,11 +24,17 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "segments"
     
-    # OpenAI
+    # OpenAI (for LLM only now)
     openai_api_key: str = ""
-    embedding_model: str = "text-embedding-3-small"
     llm_model: str = "gpt-4.1"
-    whisper_model: str = "whisper-1"
+    
+    # Local Models
+    use_local_embedding: bool = True  # Use BGE-M3 instead of OpenAI
+    use_local_whisper: bool = True    # Use local Whisper instead of OpenAI API
+    embedding_model: str = "BAAI/bge-m3"  # or "text-embedding-3-small" for OpenAI
+    embedding_dim: int = 1024  # BGE-M3 dimension (OpenAI is 1536)
+    whisper_model: str = "base"  # local whisper: tiny, base, small, medium, large
+    whisper_device: str = "cpu"  # cpu, cuda, mps (for Apple Silicon)
     
     # Anthropic (optional)
     anthropic_api_key: Optional[str] = None
@@ -45,6 +51,15 @@ class Settings(BaseSettings):
     
     # Polling
     channel_poll_interval_minutes: int = 30
+    
+    # Cloudinary
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_folder: str = "bizskill/segments"
+    
+    # Video processing
+    temp_video_dir: str = "/tmp/bizskill/videos"
     
     class Config:
         env_file = ".env"

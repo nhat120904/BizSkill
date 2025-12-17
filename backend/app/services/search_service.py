@@ -307,6 +307,7 @@ class SearchService:
                     'thumbnail_url': s.Video.thumbnail_url,
                 },
                 'channel': {
+                    'id': str(s.Channel.id),
                     'name': s.Channel.name,
                     'thumbnail_url': s.Channel.thumbnail_url,
                 },

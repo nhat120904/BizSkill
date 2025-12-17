@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     channels, videos, segments, search, 
-    categories, auth, users, admin
+    categories, auth, users, admin, public_channels
 )
 
 api_router = APIRouter()
@@ -10,6 +10,7 @@ api_router = APIRouter()
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(segments.router, prefix="/segments", tags=["segments"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
+api_router.include_router(public_channels.router, prefix="/channels", tags=["channels"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 # Protected endpoints

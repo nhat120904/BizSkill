@@ -40,6 +40,11 @@ SEED_CHANNELS = [
         "description": "Leadership, inspiration, and finding your 'Why'.",
     },
     {
+        "youtube_channel_id": "UCoOae5nYA7VqaXzerajD0lg",
+        "name": "Ali Abdaal",
+        "description": "Productivity, business, and working smarter.",
+    },
+    {
         "youtube_channel_id": "UCbxb2fqe9oNgglAoYqsYOtQ",
         "name": "The Futur",
         "description": "Business of design, pricing, and creative entrepreneurship.",
@@ -48,11 +53,6 @@ SEED_CHANNELS = [
         "youtube_channel_id": "UCIHdDJ0tjn_3j-FS7s_X1kQ",
         "name": "Valuetainment",
         "description": "Patrick Bet-David on business, politics, and entrepreneurship.",
-    },
-    {
-        "youtube_channel_id": "UCoOae5nYA7VqaXzerajD0lg",
-        "name": "Ali Abdaal",
-        "description": "Productivity, business, and working smarter.",
     },
     {
         "youtube_channel_id": "UC88tlMjiS7kf8uhPWyBTn_A",

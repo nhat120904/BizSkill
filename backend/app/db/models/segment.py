@@ -30,6 +30,13 @@ class Segment(Base):
     # Vector embedding reference
     embedding_id = Column(String(100))  # Qdrant point ID
     
+    # Cloudinary video clip
+    cloudinary_url = Column(String(500))  # Main video URL
+    cloudinary_public_id = Column(String(200))  # Cloudinary public ID
+    cloudinary_thumbnail_url = Column(String(500))  # Thumbnail URL
+    clip_status = Column(String(20), default="pending")  # pending, processing, ready, failed
+    clip_processed_at = Column(DateTime)  # When clip was processed
+    
     # Stats
     view_count = Column(BigInteger, default=0)
     save_count = Column(Integer, default=0)

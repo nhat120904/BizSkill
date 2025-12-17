@@ -129,6 +129,7 @@ async def get_category(
                     "thumbnail_url": s.video.thumbnail_url,
                 },
                 "channel": {
+                    "id": str(s.video.channel.id),
                     "name": s.video.channel.name,
                 }
             }
@@ -200,6 +201,7 @@ async def get_category_segments(
                     "thumbnail_url": s.video.thumbnail_url,
                 },
                 "channel": {
+                    "id": str(s.video.channel.id) if s.video.channel else None,
                     "name": s.video.channel.name if s.video.channel else "Unknown",
                     "thumbnail_url": s.video.channel.thumbnail_url if s.video.channel else None,
                 }

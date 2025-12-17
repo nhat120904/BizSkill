@@ -407,3 +407,526 @@ async def create_admin_user(
     db.commit()
     
     return {"status": "created", "email": email}
+
+
+@router.post("/cleanup/duplicates")
+async def cleanup_duplicates(
+    db: Session = Depends(get_db),
+    _admin = Depends(get_admin_user)
+):
+    """
+    Clean up duplicate videos and segments (admin only).
+    Removes duplicate youtube_ids (keeping best one) and duplicate segments.
+    """
+    from app.workers.maintenance_tasks import cleanup_duplicates as cleanup_task
+    
+    task = cleanup_task.delay()
+    
+    return {
+        "status": "queued", 
+        "task_id": task.id,
+        "message": "Cleanup task queued. Check task status for results."
+    }
+
+
+@router.post("/dev/cleanup")
+async def dev_cleanup_duplicates(
+    db: Session = Depends(get_db)
+):
+    """
+    DEV ONLY: Run duplicate cleanup synchronously and return results.
+    No authentication required for development.
+    """
+    from sqlalchemy import func
+    
+    stats = {
+        "duplicate_videos": 0,
+        "duplicate_segments": 0,
+        "orphan_segments": 0,
+        "details": []
+    }
+    
+    # 1. Find and remove duplicate videos
+    duplicates = db.query(
+        Video.youtube_id,
+        func.count(Video.id).label('count')
+    ).group_by(Video.youtube_id).having(func.count(Video.id) > 1).all()
+    
+    for dup in duplicates:
+        videos = db.query(Video).filter(
+            Video.youtube_id == dup.youtube_id
+        ).order_by(Video.created_at).all()
+        
+        # Keep the one with most segments and INDEXED status
+        def score_video(v):
+            seg_count = len(v.segments) if v.segments else 0
+            is_indexed = 1 if v.status == VideoStatus.INDEXED.value else 0
+            return (is_indexed, seg_count, v.created_at)
+        
+        videos_sorted = sorted(videos, key=score_video, reverse=True)
+        keep = videos_sorted[0]
+        to_delete = videos_sorted[1:]
+        
+        for v in to_delete:
+            try:
+                embedding_service = EmbeddingService()
+                embedding_service.delete_video_embeddings(str(v.id))
+            except Exception as e:
+                pass
+            
+            stats["details"].append({
+                "action": "delete_video",
+                "youtube_id": v.youtube_id,
+                "reason": f"duplicate (keeping {keep.id[:8]})"
+            })
+            db.delete(v)
+            stats["duplicate_videos"] += 1
+    
+    # 2. Find and remove duplicate segments
+    dup_segments = db.query(
+        Segment.video_id,
+        Segment.start_time,
+        Segment.end_time,
+        func.count(Segment.id).label('count')
+    ).group_by(
+        Segment.video_id, 
+        Segment.start_time, 
+        Segment.end_time
+    ).having(func.count(Segment.id) > 1).all()
+    
+    for dup in dup_segments:
+        segments = db.query(Segment).filter(
+            Segment.video_id == dup.video_id,
+            Segment.start_time == dup.start_time,
+            Segment.end_time == dup.end_time
+        ).order_by(Segment.created_at).all()
+        
+        for seg in segments[1:]:
+            if seg.embedding_id:
+                try:
+                    embedding_service = EmbeddingService()
+                    embedding_service.delete_segment_embedding(seg.embedding_id)
+                except:
+                    pass
+            db.delete(seg)
+            stats["duplicate_segments"] += 1
+    
+    # 3. Find and remove orphan segments
+    orphans = db.query(Segment).outerjoin(Video).filter(Video.id == None).all()
+    for seg in orphans:
+        if seg.embedding_id:
+            try:
+                embedding_service = EmbeddingService()
+                embedding_service.delete_segment_embedding(seg.embedding_id)
+            except:
+                pass
+        db.delete(seg)
+        stats["orphan_segments"] += 1
+    
+    db.commit()
+    
+    return {
+        "status": "complete",
+        "removed": {
+            "duplicate_videos": stats["duplicate_videos"],
+            "duplicate_segments": stats["duplicate_segments"],
+            "orphan_segments": stats["orphan_segments"],
+        },
+        "details": stats["details"][:20]  # Limit output
+    }
+
+
+@router.get("/dev/duplicates")
+async def dev_check_duplicates(
+    db: Session = Depends(get_db)
+):
+    """
+    DEV ONLY: Check for duplicates without removing them.
+    Returns a report of what would be cleaned.
+    """
+    from sqlalchemy import func
+    
+    report = {
+        "duplicate_videos": [],
+        "duplicate_segments": [],
+        "orphan_segments": 0,
+        "summary": {}
+    }
+    
+    # 1. Find duplicate videos
+    duplicates = db.query(
+        Video.youtube_id,
+        func.count(Video.id).label('count')
+    ).group_by(Video.youtube_id).having(func.count(Video.id) > 1).all()
+    
+    for dup in duplicates:
+        videos = db.query(Video).filter(
+            Video.youtube_id == dup.youtube_id
+        ).order_by(Video.created_at).all()
+        
+        report["duplicate_videos"].append({
+            "youtube_id": dup.youtube_id,
+            "count": dup.count,
+            "videos": [
+                {
+                    "id": v.id[:8],
+                    "status": v.status,
+                    "segments": len(v.segments) if v.segments else 0,
+                    "created_at": str(v.created_at)
+                }
+                for v in videos
+            ]
+        })
+    
+    # 2. Find duplicate segments
+    dup_segments = db.query(
+        Segment.video_id,
+        Segment.start_time,
+        Segment.end_time,
+        func.count(Segment.id).label('count')
+    ).group_by(
+        Segment.video_id, 
+        Segment.start_time, 
+        Segment.end_time
+    ).having(func.count(Segment.id) > 1).limit(20).all()
+    
+    for dup in dup_segments:
+        report["duplicate_segments"].append({
+            "video_id": dup.video_id[:8] if dup.video_id else None,
+            "start_time": dup.start_time,
+            "end_time": dup.end_time,
+            "count": dup.count
+        })
+    
+    # 3. Count orphan segments
+    orphan_count = db.query(func.count(Segment.id)).outerjoin(Video).filter(Video.id == None).scalar()
+    report["orphan_segments"] = orphan_count
+    
+    # Summary
+    report["summary"] = {
+        "duplicate_videos_count": len(report["duplicate_videos"]),
+        "duplicate_segments_count": len(dup_segments),
+        "orphan_segments_count": orphan_count,
+        "total_issues": len(report["duplicate_videos"]) + len(dup_segments) + orphan_count
+    }
+    
+    return report
+
+
+@router.get("/dev/stats")
+async def dev_get_stats(
+    db: Session = Depends(get_db)
+):
+    """DEV ONLY: Get database statistics without authentication."""
+    from sqlalchemy import func
+    
+    # Video stats by status
+    status_counts = dict(db.query(
+        Video.status,
+        func.count(Video.id)
+    ).group_by(Video.status).all())
+    
+    # Channel stats
+    channel_stats = db.query(
+        Channel.name,
+        func.count(Video.id).label('video_count')
+    ).outerjoin(Video).group_by(Channel.id).order_by(
+        func.count(Video.id).desc()
+    ).limit(10).all()
+    
+    # Totals
+    total_videos = db.query(func.count(Video.id)).scalar()
+    total_segments = db.query(func.count(Segment.id)).scalar()
+    total_channels = db.query(func.count(Channel.id)).scalar()
+    segments_with_embedding = db.query(func.count(Segment.id)).filter(
+        Segment.embedding_id != None
+    ).scalar()
+    
+    return {
+        "totals": {
+            "videos": total_videos,
+            "segments": total_segments,
+            "channels": total_channels,
+            "segments_with_embedding": segments_with_embedding
+        },
+        "videos_by_status": status_counts,
+        "top_channels": [
+            {"name": name, "videos": count}
+            for name, count in channel_stats
+        ]
+    }
+
+
+# ============== VIDEO CLIP PROCESSING (Cloudinary) ==============
+
+@router.get("/clips/stats")
+async def get_clip_stats(
+    db: Session = Depends(get_db),
+    _admin = Depends(get_admin_user)
+):
+    """Get video clip processing statistics (admin only)"""
+    from sqlalchemy import func
+    
+    stats = dict(db.query(
+        Segment.clip_status,
+        func.count(Segment.id)
+    ).group_by(Segment.clip_status).all())
+    
+    total = db.query(func.count(Segment.id)).scalar()
+    ready_count = stats.get("ready", 0)
+    
+    return {
+        "total_segments": total,
+        "clips_ready": ready_count,
+        "clips_pending": stats.get("pending", 0) + stats.get(None, 0),
+        "clips_processing": stats.get("processing", 0),
+        "clips_failed": stats.get("failed", 0),
+        "by_status": stats
+    }
+
+
+@router.post("/clips/process/{segment_id}")
+async def process_single_clip(
+    segment_id: str,
+    db: Session = Depends(get_db),
+    _admin = Depends(get_admin_user)
+):
+    """Process a single segment clip (admin only)"""
+    from app.workers.clip_tasks import process_segment_clip
+    
+    segment = db.query(Segment).filter(Segment.id == segment_id).first()
+    if not segment:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    
+    task = process_segment_clip.delay(segment_id)
+    
+    return {
+        "status": "queued",
+        "segment_id": segment_id,
+        "task_id": task.id
+    }
+
+
+@router.post("/clips/process-video/{video_id}")
+async def process_video_clips(
+    video_id: str,
+    db: Session = Depends(get_db),
+    _admin = Depends(get_admin_user)
+):
+    """Process all clips for a video (admin only)"""
+    from app.workers.clip_tasks import process_video_clips as task_process_video
+    
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    task = task_process_video.delay(video_id)
+    
+    return {
+        "status": "queued",
+        "video_id": video_id,
+        "task_id": task.id
+    }
+
+
+@router.post("/clips/process-all")
+async def process_all_clips(
+    limit: int = 100,
+    _admin = Depends(get_admin_user)
+):
+    """Process all pending clips (admin only)"""
+    from app.workers.clip_tasks import process_all_pending_clips
+    
+    task = process_all_pending_clips.delay(limit)
+    
+    return {
+        "status": "queued",
+        "limit": limit,
+        "task_id": task.id
+    }
+
+
+# DEV endpoints for clip processing (no auth)
+@router.get("/dev/clips/stats")
+async def dev_get_clip_stats(
+    db: Session = Depends(get_db)
+):
+    """DEV ONLY: Get clip stats without authentication"""
+    from sqlalchemy import func
+    
+    stats = dict(db.query(
+        Segment.clip_status,
+        func.count(Segment.id)
+    ).group_by(Segment.clip_status).all())
+    
+    total = db.query(func.count(Segment.id)).scalar()
+    
+    # Get some ready clips as examples
+    ready_clips = db.query(Segment).filter(
+        Segment.clip_status == "ready"
+    ).limit(5).all()
+    
+    return {
+        "total_segments": total,
+        "by_status": stats,
+        "ready_clips_sample": [
+            {
+                "id": s.id,
+                "title": s.generated_title,
+                "cloudinary_url": s.cloudinary_url,
+                "thumbnail_url": s.cloudinary_thumbnail_url
+            }
+            for s in ready_clips
+        ]
+    }
+
+
+@router.post("/dev/clips/process/{segment_id}")
+async def dev_process_clip(
+    segment_id: str,
+    db: Session = Depends(get_db)
+):
+    """DEV ONLY: Process a single clip without authentication"""
+    from app.workers.clip_tasks import process_segment_clip
+    
+    segment = db.query(Segment).filter(Segment.id == segment_id).first()
+    if not segment:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    
+    task = process_segment_clip.delay(segment_id)
+    
+    return {
+        "status": "queued",
+        "segment_id": segment_id,
+        "title": segment.generated_title,
+        "task_id": task.id
+    }
+
+
+@router.post("/dev/clips/process-batch")
+async def dev_process_batch(
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """DEV ONLY: Process a batch of pending clips"""
+    from app.workers.clip_tasks import process_segment_clip
+    
+    segments = db.query(Segment).join(Video).filter(
+        Video.status == VideoStatus.INDEXED.value,
+        Segment.clip_status.in_(["pending", None])
+    ).limit(limit).all()
+    
+    tasks = []
+    for segment in segments:
+        task = process_segment_clip.delay(str(segment.id))
+        tasks.append({
+            "segment_id": str(segment.id),
+            "title": segment.generated_title[:50] if segment.generated_title else None,
+            "task_id": task.id
+        })
+    
+    return {
+        "status": "queued",
+        "count": len(tasks),
+        "tasks": tasks
+    }
+
+
+@router.post("/dev/reindex")
+async def dev_reindex_embeddings(
+    batch_size: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    DEV ONLY: Re-index all segments with new embedding model.
+    This will:
+    1. Delete and recreate Qdrant collection with new dimensions
+    2. Re-embed all indexed segments using local BGE-M3 model
+    """
+    import structlog
+    logger = structlog.get_logger()
+    
+    # Get all indexed segments
+    segments = db.query(Segment).join(Video).filter(
+        Video.status == VideoStatus.INDEXED.value
+    ).all()
+    
+    total = len(segments)
+    logger.info("Starting re-index", total_segments=total)
+    
+    # Recreate collection with correct dimensions
+    embedding_service = EmbeddingService()
+    embedding_service.recreate_collection()
+    
+    # Process in batches
+    processed = 0
+    failed = 0
+    
+    for i in range(0, total, batch_size):
+        batch = segments[i:i+batch_size]
+        
+        for segment in batch:
+            try:
+                video = segment.video
+                channel = video.channel
+                # SegmentCategory is association table, need to access category.name
+                categories = [sc.category.name for sc in segment.categories if sc.category] if segment.categories else []
+                
+                embedding_service.store_segment_embedding(
+                    segment_id=str(segment.id),
+                    title=segment.generated_title or "",
+                    summary=segment.summary_text or "",  # Field is summary_text not summary
+                    transcript=segment.transcript_chunk or "",  # Field is transcript_chunk
+                    video_id=str(video.id),
+                    youtube_id=video.youtube_id,
+                    channel_name=channel.name if channel else "",
+                    start_time=int(segment.start_time),
+                    end_time=int(segment.end_time),
+                    relevance_score=int(segment.relevance_score or 5),
+                    categories=categories,
+                    thumbnail_url=video.thumbnail_url
+                )
+                processed += 1
+                
+            except Exception as e:
+                logger.error("Failed to re-index segment", 
+                           segment_id=str(segment.id), 
+                           error=str(e))
+                failed += 1
+        
+        logger.info("Re-index progress", processed=processed, failed=failed, total=total)
+    
+    return {
+        "status": "completed",
+        "total": total,
+        "processed": processed,
+        "failed": failed,
+        "embedding_dim": embedding_service.embedding_dim,
+        "use_local": embedding_service.use_local
+    }
+
+
+@router.get("/dev/qdrant-info")
+async def dev_qdrant_info():
+    """DEV ONLY: Get Qdrant collection info"""
+    from qdrant_client import QdrantClient
+    from app.core.config import settings
+    
+    client = QdrantClient(url=settings.qdrant_url)
+    
+    try:
+        collection = client.get_collection(settings.qdrant_collection)
+        return {
+            "collection_name": settings.qdrant_collection,
+            "vectors_count": collection.vectors_count,
+            "points_count": collection.points_count,
+            "config": {
+                "size": collection.config.params.vectors.size,
+                "distance": str(collection.config.params.vectors.distance)
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "collection_name": settings.qdrant_collection
+        }

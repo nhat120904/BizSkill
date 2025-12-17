@@ -417,6 +417,7 @@ def cleanup_and_finalize(audio_path: str, video_id: str):
     """Step 6: Clean up and mark as complete"""
     from pathlib import Path
     from app.services.audio_service import AudioExtractionService
+    from app.workers.clip_tasks import process_segment_clip
     
     db = get_db_session()
     try:
@@ -437,16 +438,23 @@ def cleanup_and_finalize(audio_path: str, video_id: str):
         
         segment_count = len(video.segments)
         
+        # Auto-queue clip processing for all segments
+        for segment in video.segments:
+            if segment.clip_status == "pending":
+                process_segment_clip.delay(str(segment.id))
+        
         logger.info("Video processing complete", 
                    video_id=video_id,
                    youtube_id=video.youtube_id,
                    title=video.original_title,
-                   segments=segment_count)
+                   segments=segment_count,
+                   clips_queued=segment_count)
         
         return {
             'video_id': video_id,
             'status': 'indexed',
-            'segments': segment_count
+            'segments': segment_count,
+            'clips_queued': segment_count
         }
         
     except Exception as e:

@@ -5,11 +5,11 @@ import { api } from '@/lib/api';
 import { Segment } from '@/types';
 import { 
   Sparkles, Flame, Clock, Play, Pause, Volume2, VolumeX, 
-  Bookmark, ChevronUp, ChevronDown, User, ExternalLink, Info
+  Bookmark, ChevronUp, ChevronDown, User, ExternalLink, Info, Shuffle
 } from 'lucide-react';
 import Link from 'next/link';
 
-type FeedType = 'trending' | 'latest' | 'recommended';
+type FeedType = 'trending' | 'latest' | 'random';
 
 interface ShortPlayerProps {
   segment: Segment;
@@ -168,18 +168,21 @@ function ShortPlayer({ segment, isActive, isMuted, onToggleMute }: ShortPlayerPr
       {/* Right Side Actions */}
       <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6 z-20">
         {/* Channel Avatar */}
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center border-2 border-white">
+        <Link 
+          href={segment.channel?.id ? `/channel/${segment.channel.id}` : '#'} 
+          className="flex flex-col items-center group"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center border-2 border-white group-hover:border-primary-400 transition-colors">
             {segment.channel?.thumbnail_url ? (
               <img src={segment.channel.thumbnail_url} alt="" className="w-full h-full rounded-full object-cover" />
             ) : (
               <User className="w-6 h-6 text-white" />
             )}
           </div>
-          <div className="w-6 h-6 -mt-3 bg-primary-600 rounded-full flex items-center justify-center">
+          <div className="w-6 h-6 -mt-3 bg-primary-600 group-hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors">
             <span className="text-white text-xs font-bold">+</span>
           </div>
-        </div>
+        </Link>
 
         {/* Detail/Watch Page */}
         <Link href={`/watch/${segment.id}`} className="flex flex-col items-center gap-1 group">
@@ -248,7 +251,7 @@ function ShortPlayer({ segment, isActive, isMuted, onToggleMute }: ShortPlayerPr
 export default function FeedPage() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [feedType, setFeedType] = useState<FeedType>('trending');
+  const [feedType, setFeedType] = useState<FeedType>('random');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [page, setPage] = useState(1);
@@ -366,9 +369,9 @@ export default function FeedPage() {
   }, [goToNext, goToPrev]);
 
   const feedTabs = [
+    { type: 'random' as FeedType, label: 'For You', icon: Shuffle },
     { type: 'trending' as FeedType, label: 'Trending', icon: Flame },
     { type: 'latest' as FeedType, label: 'Latest', icon: Clock },
-    { type: 'recommended' as FeedType, label: 'For You', icon: Sparkles },
   ];
 
   return (

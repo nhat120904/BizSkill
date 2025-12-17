@@ -60,10 +60,18 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - SECRET_KEY=${SECRET_KEY:-super-secret-key-change-in-production}
+      # Local models config
+      - USE_LOCAL_EMBEDDING=${USE_LOCAL_EMBEDDING:-true}
+      - USE_LOCAL_WHISPER=${USE_LOCAL_WHISPER:-true}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
     volumes:
       - ./backend:/app
       - ./scripts:/app/scripts
       - temp_audio:/tmp/bizskill
+      - huggingface_cache:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,9 +93,21 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER:-bizskill/segments}
+      # Local models config
+      - USE_LOCAL_EMBEDDING=${USE_LOCAL_EMBEDDING:-true}
+      - USE_LOCAL_WHISPER=${USE_LOCAL_WHISPER:-true}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
     volumes:
       - ./backend:/app
       - temp_audio:/tmp/bizskill
+      - huggingface_cache:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +115,7 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
-    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=6
 
   # Celery Beat Scheduler
   celery-beat:
@@ -152,3 +172,4 @@ volumes:
   redis_data:
   qdrant_data:
   temp_audio:
+  huggingface_cache:

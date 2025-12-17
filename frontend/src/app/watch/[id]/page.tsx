@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Segment } from '@/types';
 import SegmentCard from '@/components/segments/SegmentCard';
@@ -225,10 +226,29 @@ export default function WatchPage() {
                   {formatDuration(duration)}
                 </span>
                 {segment.channel && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-4 w-4" />
-                    {segment.channel.name}
-                  </span>
+                  <Link 
+                    href={`/channel/${segment.channel.id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 
+                             rounded-full transition-colors group"
+                  >
+                    {segment.channel.thumbnail_url ? (
+                      <img
+                        src={segment.channel.thumbnail_url}
+                        alt={segment.channel.name}
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 
+                                    flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">
+                          {segment.channel.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <span className="group-hover:text-white transition-colors">
+                      {segment.channel.name}
+                    </span>
+                  </Link>
                 )}
                 {segment.view_count !== undefined && (
                   <span>{segment.view_count.toLocaleString()} views</span>
