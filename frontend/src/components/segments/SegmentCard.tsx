@@ -152,7 +152,11 @@ export function SegmentCard({ segment, compact = false }: SegmentCardProps) {
           {segment.categories && segment.categories.length > 0 && (
             <>
               <span>•</span>
-              <span>{segment.categories[0]}</span>
+              <span>
+                {typeof segment.categories[0] === 'string' 
+                  ? segment.categories[0] 
+                  : segment.categories[0]?.category?.name || segment.categories[0]?.name}
+              </span>
             </>
           )}
         </div>

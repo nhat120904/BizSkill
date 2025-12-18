@@ -148,12 +148,13 @@ async def add_history(
 
 @router.get("/me/saved")
 async def get_saved_segments(
-    skip: int = 0,
+    page: int = 1,
     limit: int = 50,
     user: User = Depends(get_current_user_required),
     db: Session = Depends(get_db)
 ):
     """Get saved segments"""
+    skip = (page - 1) * limit
     saved = db.query(SavedSegment).filter(
         SavedSegment.user_id == user.id
     ).order_by(
@@ -161,19 +162,35 @@ async def get_saved_segments(
     ).offset(skip).limit(limit).all()
     
     return {
-        "saved": [
+        "segments": [
             {
-                "segment": {
-                    "id": s.segment.id,
-                    "title": s.segment.generated_title,
-                    "summary": s.segment.summary_text,
-                    "thumbnail_url": s.segment.video.thumbnail_url,
+                "id": str(s.segment.id),
+                "title": s.segment.generated_title,
+                "generated_title": s.segment.generated_title,
+                "summary": s.segment.summary_text,
+                "summary_text": s.segment.summary_text,
+                "thumbnail_url": s.segment.video.thumbnail_url,
+                "youtube_id": s.segment.video.youtube_id,
+                "start_time": s.segment.start_time,
+                "end_time": s.segment.end_time,
+                "channel_name": s.segment.video.channel.name,
+                "relevance_score": s.segment.relevance_score,
+                "view_count": s.segment.view_count,
+                "video": {
                     "youtube_id": s.segment.video.youtube_id,
-                    "start_time": s.segment.start_time,
-                    "end_time": s.segment.end_time,
-                    "channel_name": s.segment.video.channel.name,
+                    "thumbnail_url": s.segment.video.thumbnail_url,
+                    "channel": {
+                        "name": s.segment.video.channel.name,
+                        "thumbnail_url": s.segment.video.channel.thumbnail_url
+                    }
                 },
-                "saved_at": s.saved_at,
+                "categories": [{
+                    "category": {
+                        "name": sc.category.name,
+                        "slug": sc.category.slug
+                    }
+                } for sc in s.segment.categories] if s.segment.categories else [],
+                "saved_at": s.saved_at.isoformat() if s.saved_at else None,
             }
             for s in saved
         ]

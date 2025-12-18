@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -68,10 +68,17 @@ class UserHistory(Base):
 class SavedSegment(Base):
     __tablename__ = "saved_segments"
     
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    segment_id = Column(String(36), ForeignKey("segments.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    segment_id = Column(String(36), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False)
     
     saved_at = Column(DateTime, default=datetime.utcnow)
+    notes = Column(String)  # Optional notes field
+    
+    # Unique constraint for user_id + segment_id
+    __table_args__ = (
+        UniqueConstraint('user_id', 'segment_id', name='uq_user_segment'),
+    )
     
     # Relationships
     user = relationship("User", back_populates="saved_segments")
